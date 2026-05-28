@@ -4,6 +4,9 @@
 
 import sys
 import os
+import json
+import csv
+from argparse import ArgumentParser
 
 def validate_input(fasta_file):
     """Validate that the input file exists and is readable."""
@@ -60,33 +63,83 @@ def calculate_statistics(sequence):
         "gc_content": gc_content
     }
 
+def output_txt(sequence_name, stats):
+    """Output results in plain text format."""
+    output = []
+    output.append("Genome summary")
+    output.append("-" * 30)
+    output.append(f"Sequence name: {sequence_name}")
+    output.append(f"Genome length: {stats['length']} nucleotides")
+    output.append(f"A count: {stats['a_count']}")
+    output.append(f"T count: {stats['t_count']}")
+    output.append(f"G count: {stats['g_count']}")
+    output.append(f"C count: {stats['c_count']}")
+    output.append(f"Other/ambiguous: {stats['other_count']}")
+    output.append(f"GC content: {stats['gc_content']:.2f}%")
+    return "\n".join(output)
+
+def output_json(sequence_name, stats):
+    """Output results in JSON format."""
+    data = {
+        "sequence_name": sequence_name,
+        "genome_length": stats['length'],
+        "nucleotide_counts": {
+            "A": stats['a_count'],
+            "T": stats['t_count'],
+            "G": stats['g_count'],
+            "C": stats['c_count'],
+            "other": stats['other_count']
+        },
+        "gc_content_percent": round(stats['gc_content'], 2)
+    }
+    return json.dumps(data, indent=2)
+
+def output_csv(sequence_name, stats):
+    """Output results in CSV format."""
+    output = []
+    output.append("Metric,Value")
+    output.append(f"Sequence name,{sequence_name}")
+    output.append(f"Genome length,{stats['length']}")
+    output.append(f"A count,{stats['a_count']}")
+    output.append(f"T count,{stats['t_count']}")
+    output.append(f"G count,{stats['g_count']}")
+    output.append(f"C count,{stats['c_count']}")
+    output.append(f"Other/ambiguous,{stats['other_count']}")
+    output.append(f"GC content (%),{stats['gc_content']:.2f}")
+    return "\n".join(output)
+
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: fasta_summary.py <fasta_file>", file=sys.stderr)
-        sys.exit(1)
+    parser = ArgumentParser(description="Summarize a viral FASTA file")
+    parser.add_argument("fasta_file", help="Path to FASTA file")
+    parser.add_argument("--format", default="txt", choices=["txt", "json", "csv", "all"],
+                        help="Output format (default: txt)")
     
-    fasta_file = sys.argv[1]
+    args = parser.parse_args()
     
     # Validate input
-    validate_input(fasta_file)
+    validate_input(args.fasta_file)
     
     # Parse FASTA
-    sequence_name, sequence = parse_fasta(fasta_file)
+    sequence_name, sequence = parse_fasta(args.fasta_file)
     
     # Calculate statistics
     stats = calculate_statistics(sequence)
     
-    # Print results
-    print("Genome summary")
-    print("-" * 30)
-    print(f"Sequence name: {sequence_name}")
-    print(f"Genome length: {stats['length']} nucleotides")
-    print(f"A count: {stats['a_count']}")
-    print(f"T count: {stats['t_count']}")
-    print(f"G count: {stats['g_count']}")
-    print(f"C count: {stats['c_count']}")
-    print(f"Other/ambiguous: {stats['other_count']}")
-    print(f"GC content: {stats['gc_content']:.2f}%")
+    # Generate output based on format
+    if args.format == "txt" or args.format == "all":
+        print(output_txt(sequence_name, stats))
+    
+    if args.format == "json":
+        print(output_json(sequence_name, stats))
+    elif args.format == "all":
+        print("\n" + "="*30 + "\n")
+        print(output_json(sequence_name, stats))
+    
+    if args.format == "csv":
+        print(output_csv(sequence_name, stats))
+    elif args.format == "all":
+        print("\n" + "="*30 + "\n")
+        print(output_csv(sequence_name, stats))
 
 if __name__ == "__main__":
     main()
